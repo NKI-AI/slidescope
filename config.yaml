@@ -1,0 +1,7 @@
+server:
+  port: 8080
+sqlite:
+  filename: slidescope.sqlite
+deepzoom:
+  tile_size: 254 # preferably tile_size + tile_overlap is a multiple of 256 for best performance
+  tile_overlap: 1

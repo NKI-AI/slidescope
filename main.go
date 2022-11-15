@@ -2,7 +2,7 @@ package main
 
 import "C"
 import (
-	"flag"
+	"fmt"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
@@ -11,22 +11,34 @@ import (
 	"slidescope/deepzoom"
 	"slidescope/middlewares"
 	"slidescope/models"
+	"slidescope/utils"
 	"time"
 )
 
 func main() {
-	log.Info("Starting slidescope")
-	tileSize := 254
-	tileOverlap := 1
+	log.Info("Starting SlideScope...")
+
+	// Generate our config based on the config supplied
+	// by the user in the flags
+	configPath, debugMode, err := utils.ParseFlags()
+	if err != nil {
+		log.Fatal(err)
+	}
+	config, err := utils.NewConfig(configPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	tileSize := config.DeepZoom.TileSize
+	tileOverlap := config.DeepZoom.TileOverlap
 
 	// Debug mode enables gin-gonic debug mode
-	debugMode := flag.Bool("debug", false, "GIN debug mode")
-	if *debugMode == false {
+	if debugMode == false {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
 	// Connect to the database
-	models.ConnectDataBase()
+	models.ConnectDataBase(config.Sqlite.Filename)
 
 	r := gin.Default()
 
@@ -104,13 +116,18 @@ func main() {
 	api.POST("/register", controllers.Register)
 	api.POST("/login", controllers.Login)
 
+	// TODO: Use https://github.com/gin-contrib/sessions to keep the cookie
 	protected := r.Group("/api/admin")
 	protected.Use(middlewares.JwtAuthMiddleware())
 	protected.GET("/user", controllers.CurrentUser)
 
-	r.Run() // listen and serve on 0.0.0.0:8080
+	err = r.Run(fmt.Sprintf(":%s", config.Server.Port))
+	if err != nil {
+		log.Fatal(fmt.Sprintf("Could not start server on port %s", config.Server.Port))
+	}
 
 	// TODO: How to make sure all file handlers are closed when exiting?
+	// Check https://github.com/gin-gonic/gin#manually
 	cache.EmptyCache()
 
 }
