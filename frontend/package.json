@@ -1,0 +1,26 @@
+{
+  "name": "slidescope-frontend",
+  "version": "0.0.1",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "webpack --mode development --entry ./assets/js/main.js --output-path ./static",
+    "build": "webpack --mode production --entry ./assets/js/main.js --output-path ./static"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "mini-css-extract-plugin": "^2.7.0",
+    "ol": "^7.1.0",
+    "postcss-loader": "^7.0.1",
+    "sass": "^1.56.1",
+    "sass-loader": "^13.2.0",
+    "style-loader": "^3.3.1",
+    "webpack": "^5.75.0"
+  },
+  "devDependencies": {
+    "css-loader": "^6.7.2",
+    "webpack-cli": "^5.0.0"
+  }
+}
