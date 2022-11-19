@@ -20,7 +20,7 @@ func GetUserByID(uid uint) (User, error) {
 
 	var u User
 
-	if err := DB.First(&u, uid).Error; err != nil {
+	if err := Database.First(&u, uid).Error; err != nil {
 		return u, errors.New("DeepZoomStruct not found!")
 	}
 
@@ -42,7 +42,7 @@ func LoginCheck(username string, password string) (string, error) {
 
 	var err error
 	u := User{}
-	err = DB.Model(User{}).Where("username = ?", username).Take(&u).Error
+	err = Database.Model(User{}).Where("username = ?", username).Take(&u).Error
 	if err != nil {
 		return "", err
 	}
@@ -63,7 +63,7 @@ func LoginCheck(username string, password string) (string, error) {
 func (u *User) SaveUser() (*User, error) {
 
 	var err error
-	err = DB.Create(&u).Error
+	err = Database.Create(&u).Error
 	if err != nil {
 		return &User{}, err
 	}

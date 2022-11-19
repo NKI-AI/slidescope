@@ -123,6 +123,7 @@ func (lc *LocalCache) EmptyCache() {
 	log.Debug("Emptying complete cache.")
 	// delete all elements
 	for key, _ := range lc.deepzooms {
+		log.Debug(fmt.Sprintf("Deleting key %s", key))
 		lc.delete(key)
 	}
 }

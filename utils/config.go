@@ -10,9 +10,11 @@ import (
 
 // Config struct for webapp config
 type Config struct {
+	// TODO: Validate these inputs (sum 256, or format = png or jpg)
 	DeepZoom struct {
-		TileSize    int `yaml:"tile_size"`
-		TileOverlap int `yaml:"tile_overlap"`
+		TileSize    int    `yaml:"tile_size"`
+		TileOverlap int    `yaml:"tile_overlap"`
+		Format      string `yaml:"format"`
 	}
 
 	Sqlite struct {

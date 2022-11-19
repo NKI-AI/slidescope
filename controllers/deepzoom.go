@@ -63,11 +63,10 @@ func parseDeepZoomCoordinates(c *gin.Context) (DeepZoomCoordinates, error) {
 // parseIdentifier Parse the image identifier to a database entry.
 func parseIdentifier(c *gin.Context) (models.Image, error) {
 	imageId := c.Param("image_identifier")
-
 	// Let's try to find it.
 	var reqImage models.Image
 
-	if err := models.DB.Where("Identifier = ?", imageId).First(&reqImage).Error; err != nil {
+	if err := models.Database.Where("Identifier = ?", imageId).First(&reqImage).Error; err != nil {
 		return models.Image{}, errors.New("image not found")
 	}
 	return reqImage, nil
@@ -134,41 +133,59 @@ func writeTileFromCachedDeepZoom(c *gin.Context, cache *deepzoom.LocalCache, Ide
 }
 
 // GetOverlayTile Get a tile for an overlay
-func GetOverlayTile(cache *deepzoom.LocalCache, tileSize int, tileOverlap int) gin.HandlerFunc {
+func GetOverlayTile(cache *deepzoom.LocalCache, config *utils.Config) gin.HandlerFunc {
 	fn := func(c *gin.Context) {
 		imageId := c.Param("image_identifier")
 		overlayId := c.Param("overlay_identifier")
 
 		// Let's try to find it.
 		var reqImage models.Image
-		if err := models.DB.Preload("MaskAnnotations", "Identifier = ?", overlayId).Where("Identifier = ?", imageId).First(&reqImage).Error; err != nil {
+		if err := models.Database.Preload("MaskAnnotations", "Identifier = ?", overlayId).Where("Identifier = ?", imageId).First(&reqImage).Error; err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 			return
 		}
 
 		mask := reqImage.MaskAnnotations[0]
-		writeTileFromCachedDeepZoom(c, cache, mask.Identifier, mask.Path, tileSize, tileOverlap)
+		writeTileFromCachedDeepZoom(
+			c,
+			cache,
+			mask.Identifier,
+			mask.Path,
+			config.DeepZoom.TileSize,
+			config.DeepZoom.TileOverlap)
 	}
 	return fn
 }
 
 // GetTile Get DeepZoom tile and write to output
-func GetTile(cache *deepzoom.LocalCache, tileSize int, tileOverlap int) gin.HandlerFunc {
+func GetTile(cache *deepzoom.LocalCache, config *utils.Config) gin.HandlerFunc {
 	fn := func(c *gin.Context) {
 		parsedIdentifier, err := parseIdentifier(c)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 			return
 		}
-		writeTileFromCachedDeepZoom(c, cache, parsedIdentifier.Identifier, parsedIdentifier.Path, tileSize, tileOverlap)
+		writeTileFromCachedDeepZoom(
+			c,
+			cache,
+			parsedIdentifier.Identifier,
+			parsedIdentifier.Path,
+			config.DeepZoom.TileSize,
+			config.DeepZoom.TileOverlap)
 	}
 	return fn
 }
 
 // GetThumbnail Get the thumbnail of an image.
-func GetThumbnail(cache *deepzoom.LocalCache, tileSize int, tileOverlap int, format string) gin.HandlerFunc {
+func GetThumbnail(cache *deepzoom.LocalCache, config *utils.Config) gin.HandlerFunc {
+	// Format is ignored, as thumbnails are postfixed with png or jpg
+	tileSize := config.DeepZoom.TileSize
+	tileOverlap := config.DeepZoom.TileOverlap
 	fn := func(c *gin.Context) {
 		parsedIdentifier, err := parseIdentifier(c)
+		// Only thumbnail.{jpg,png} is allowed in the route
+		splitPath := strings.Split(c.FullPath(), ".")
+		format := splitPath[len(splitPath)-1]
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 			return
@@ -187,7 +204,7 @@ func GetThumbnail(cache *deepzoom.LocalCache, tileSize int, tileOverlap int, for
 		}
 		var quality = c.DefaultQuery("Q", "-1")
 		jpgQuality, err := strconv.ParseInt(quality, 10, 64)
-		if format == "jpeg" {
+		if format == "jpg" {
 			if jpgQuality == -1 {
 				jpgQuality = 75
 			}
@@ -196,11 +213,17 @@ func GetThumbnail(cache *deepzoom.LocalCache, tileSize int, tileOverlap int, for
 				c.JSON(http.StatusBadRequest, gin.H{"message": "Incorrect value for quality."})
 				return
 			}
-		} else {
-			c.JSON(http.StatusBadRequest, gin.H{"message": "Compression quality only makes sense for jpeg."})
+		}
+		if format == "png" && jpgQuality != -1 {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "Compression quality only makes sense for jpg."})
 		}
 
-		deepZoom, err := deepzoom.GetCachedDeepZoom(cache, parsedIdentifier.Identifier, parsedIdentifier.Identifier, tileSize, tileOverlap, true, format)
+		deepZoom, err := deepzoom.GetCachedDeepZoom(
+			cache,
+			parsedIdentifier.Identifier,
+			parsedIdentifier.Path,
+			tileSize,
+			tileOverlap, true, config.DeepZoom.Format)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"data": err.Error()})
 			return
@@ -233,7 +256,7 @@ func GetThumbnail(cache *deepzoom.LocalCache, tileSize int, tileOverlap int, for
 }
 
 // GetDzi Get the deepzoom XML for a given image
-func GetDzi(cache *deepzoom.LocalCache, tileSize int, tileOverlap int, format string) gin.HandlerFunc {
+func GetDzi(cache *deepzoom.LocalCache, config *utils.Config) gin.HandlerFunc {
 	fn := func(c *gin.Context) {
 		parsedIdentifier, err := parseIdentifier(c)
 		if err != nil {
@@ -243,7 +266,14 @@ func GetDzi(cache *deepzoom.LocalCache, tileSize int, tileOverlap int, format st
 
 		var deepZoom *deepzoom.DeepZoom
 
-		deepZoom, err = deepzoom.GetCachedDeepZoom(cache, parsedIdentifier.Identifier, parsedIdentifier.Path, tileSize, tileOverlap, true, format)
+		deepZoom, err = deepzoom.GetCachedDeepZoom(
+			cache,
+			parsedIdentifier.Identifier,
+			parsedIdentifier.Path,
+			config.DeepZoom.TileSize,
+			config.DeepZoom.TileOverlap,
+			true,
+			config.DeepZoom.Format)
 
 		message, err := deepZoom.GetDzi()
 		if err != nil {
@@ -256,8 +286,11 @@ func GetDzi(cache *deepzoom.LocalCache, tileSize int, tileOverlap int, format st
 }
 
 // GetImageProperties Get all the properties given in the OpenSlide object
-func GetImageProperties(cache *deepzoom.LocalCache, tileSize int, tileOverlap int, format string) gin.HandlerFunc {
+func GetImageProperties(cache *deepzoom.LocalCache, config *utils.Config) gin.HandlerFunc {
 	fn := func(c *gin.Context) {
+		tileSize := config.DeepZoom.TileSize
+		tileOverlap := config.DeepZoom.TileOverlap
+		format := config.DeepZoom.Format
 		parsedIdentifier, err := parseIdentifier(c)
 
 		if err != nil {

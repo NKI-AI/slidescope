@@ -12,7 +12,8 @@ import (
 // FindImages Find all images with annotations
 func FindImages(c *gin.Context) {
 	var images []models.Image
-	models.DB.Preload("MaskAnnotations").Find(&images)
+
+	models.Database.Preload("MaskAnnotations").Find(&images)
 
 	c.JSON(http.StatusOK, gin.H{"data": images})
 }
@@ -55,7 +56,7 @@ func CreateImage(c *gin.Context) {
 
 	// Create image
 	image := models.Image{Path: input.Path, Identifier: input.Identifier, MaskAnnotations: input.MaskAnnotations}
-	models.DB.Create(&image)
+	models.Database.Create(&image)
 
 	c.JSON(http.StatusOK, gin.H{"data": image})
 }
@@ -64,7 +65,7 @@ func CreateImage(c *gin.Context) {
 func FindImage(c *gin.Context) { // Get model if exist
 	var image models.Image
 
-	if err := models.DB.Preload("MaskAnnotations").Where("id = ?", c.Param("id")).First(&image).Error; err != nil {
+	if err := models.Database.Preload("MaskAnnotations").Where("id = ?", c.Param("id")).First(&image).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found!"})
 		return
 	}
@@ -82,7 +83,7 @@ type UpdateImageInput struct {
 func UpdateImage(c *gin.Context) {
 	// Get model if exist
 	var image models.Image
-	if err := models.DB.Where("id = ?", c.Param("id")).First(&image).Error; err != nil {
+	if err := models.Database.Where("id = ?", c.Param("id")).First(&image).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found!"})
 		return
 	}
@@ -99,12 +100,12 @@ func UpdateImage(c *gin.Context) {
 func DeleteImage(c *gin.Context) {
 	// Get model if exist
 	var image models.Image
-	if err := models.DB.Where("id = ?", c.Param("id")).First(&image).Error; err != nil {
+	if err := models.Database.Where("id = ?", c.Param("id")).First(&image).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found!"})
 		return
 	}
 
-	models.DB.Delete(&image)
+	models.Database.Delete(&image)
 
 	c.JSON(http.StatusOK, gin.H{"data": true})
 }
